@@ -1,4 +1,8 @@
 const { Schema, model } = require('mongoose');
+const uniqueValidator = require('mongoose-unique-validator');
+const mongooseLeanId = require('mongoose-lean-id');
+const mongooseLeanVirtuals = require('mongoose-lean-virtuals');
+const bcrypt = require('bcryptjs');
 
 const { formatLink } = require('../utils/files-paths');
 const { env, constants } = require('../config/constants');
@@ -24,11 +28,7 @@ const userSchema = new Schema(
     password: {
       type: String,
       required: true,
-    },
-    image: {
-      type: String,
-      trim: true,
-      default: constants.DEFAULT_USER_IMAGE,
+      select: false,
     },
     isAdmin: {
       type: Boolean,
@@ -37,10 +37,15 @@ const userSchema = new Schema(
     isEmailConfirmed: {
       type: Boolean,
       default: false,
+      select: false,
     },
     isGroupsPrivate: {
       type: Boolean,
       default: false,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
     },
     groups: [
       {
@@ -56,16 +61,29 @@ const userSchema = new Schema(
   { toObject: { virtuals: true }, toJSON: { virtuals: true }, versionKey: false }
 );
 
-userSchema.virtual('id').get(function () {
-  return this._id.toString();
+userSchema.virtual('imageUrl').get(function () {
+  return formatLink(env.BACKEND_URL, 'profiles-images', this.id + '.png');
 });
 
-// userSchema.virtual('imagePath').get(function () {
-//   return formatPath('public', 'profiles-images', this.image);
-// });
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    return next();
+  }
 
-userSchema.virtual('imageUrl').get(function () {
-  return formatLink(env.BACKEND_URL, 'profiles-images', this.image);
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+userSchema.plugin(mongooseLeanVirtuals);
+userSchema.plugin(mongooseLeanId);
+userSchema.plugin(uniqueValidator, {
+  message: 'There is already a user with that {PATH}',
 });
 
 module.exports = model('User', userSchema);

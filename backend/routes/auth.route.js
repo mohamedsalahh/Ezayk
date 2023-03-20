@@ -6,10 +6,11 @@ const authMiddleware = require('../middlewares/auth.middleware');
 const authValidator = require('../validators/auth.validator');
 const validate = require('../middlewares/validation.middleware');
 const asyncErrorHandler = require('../middlewares/asyncErrorHandler.middleware');
+const bruteforce = require('../config/bruteforce');
 
 const router = express.Router();
 
-router.put(
+router.post(
   '/signup',
   [body('username').trim(), body('email').normalizeEmail(), body('password').trim()],
   validate(authValidator.signup),
@@ -18,7 +19,9 @@ router.put(
 
 router.post(
   '/login',
-  [body('email').trim().toLowerCase(), body('password').trim()],
+  bruteforce.prevent,
+  [body('email').trim(), body('password').trim()],
+  validate(authValidator.login),
   asyncErrorHandler(authMiddleware.normalizeUserCredentials),
   asyncErrorHandler(authController.login)
 );
@@ -29,7 +32,22 @@ router.post(
   asyncErrorHandler(authController.logout)
 );
 
-router.get('/confirmation/:token', asyncErrorHandler(authController.confirmUserEmail));
+router.post(
+  '/confirm-email/:confirmationToken',
+  asyncErrorHandler(authController.confirmUserEmail)
+);
+
+router.post(
+  '/forgot-password',
+  validate(authValidator.forgotPassword),
+  asyncErrorHandler(authController.forgotPassword)
+);
+
+router.post(
+  '/reset-password/:resetPasswordToken',
+  validate(authValidator.resetPassword),
+  asyncErrorHandler(authController.resetPassword)
+);
 
 router.get(
   '/token',

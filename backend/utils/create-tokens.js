@@ -48,3 +48,15 @@ exports.createConfirmationEmailToken = (userId) => {
 
   return confirmationEmailToken;
 };
+
+exports.createResetPasswordToken = (userId) => {
+  const resetPasswordToken = jwt.sign(
+    {
+      userId,
+    },
+    env.RESET_PASSWORD_TOKEN_SECRET,
+    { expiresIn: constants.RESET_PASSWORD_TOKEN_TIME }
+  );
+
+  return resetPasswordToken;
+};

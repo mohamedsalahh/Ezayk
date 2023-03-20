@@ -47,6 +47,12 @@ router.get(
   asyncErrorHandler(groupController.createGroupJoinLink)
 );
 
-router.route('/:id');
+router.put(
+  '/:id/image',
+  validate(groupValidator.updateGroupImage),
+  asyncErrorHandler(groupMiddleware.getGroup),
+  groupController.updateGroupImage.single('file'),
+  (req, res) => res.sendStatus(204)
+);
 
 module.exports = router;

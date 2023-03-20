@@ -3,14 +3,20 @@ const boom = require('@hapi/boom');
 const { body } = require('express-validator');
 
 const redisClient = require('../config/redis');
-const { env, constants } = require('../config/constants');
+const { env } = require('../config/constants');
 
 exports.verifyAccessToken = async (req, res, next) => {
   const authHeader = req.get('Authorization');
 
   const accessToken = authHeader && authHeader.split(' ')[1];
 
-  const decodedAccessToken = accessToken && jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET);
+  let decodedAccessToken;
+  try {
+    decodedAccessToken = accessToken && jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET);
+  } catch (err) {
+    return next(boom.unauthorized());
+  }
+
   if (!decodedAccessToken) {
     return next(boom.unauthorized());
   }
@@ -29,7 +35,13 @@ exports.verifyAccessToken = async (req, res, next) => {
 exports.verifyRefreshToken = async (req, res, next) => {
   const refreshToken = req.cookies?.refreshToken;
 
-  const decodedRefreshToken = refreshToken && jwt.verify(refreshToken, env.REFRESH_TOKEN_SECRET);
+  let decodedRefreshToken;
+  try {
+    decodedRefreshToken = refreshToken && jwt.verify(refreshToken, env.REFRESH_TOKEN_SECRET);
+  } catch (err) {
+    return next(boom.unauthorized());
+  }
+
   if (!decodedRefreshToken) {
     return next(boom.unauthorized());
   }
@@ -43,10 +55,15 @@ exports.verifyRefreshToken = async (req, res, next) => {
   next();
 };
 
-exports.normalizeUserCredentials = async (req, res, next) => {
-  const email = req.body.email;
+exports.isAdmin = (req, res, next) => {
+  if (!user.isAdmin) {
+    return next(boom.forbidden("You don't have the access for this"));
+  }
+  next();
+};
 
-  const isEmail = email.match(constants.EMAIL_REGEX) ? true : false;
+exports.normalizeUserCredentials = async (req, res, next) => {
+  const isEmail = req.isEmail;
   if (isEmail) {
     await body('email').normalizeEmail().run(req);
   }

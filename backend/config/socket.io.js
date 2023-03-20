@@ -1,5 +1,6 @@
 const socketIo = require('socket.io');
 
+const logger = require('./logger');
 const { env } = require('./constants');
 
 let io;
@@ -12,9 +13,9 @@ exports.connectToSocketIo = async (server) => {
       },
     });
 
-    console.log('Connected to Socket.io');
+    logger.info('Connected to Socket.io');
   } catch (err) {
-    console.log(err);
+    logger.error(err);
   }
 };
 

@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 module.exports.env = {
+  NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT || 8080,
   MONGO_URI: process.env.MONGO_URI,
   REDIS_HOST: process.env.REDIS_HOST,
@@ -15,13 +16,21 @@ module.exports.env = {
   EMAIL_USERNAME: process.env.EMAIL_USERNAME,
   EMAIL_TOKEN_SECRET: process.env.EMAIL_TOKEN_SECRET,
   GROUP_JOIN_LINK_TOKEN_SECRET: process.env.GROUP_JOIN_LINK_TOKEN_SECRET,
+  RESET_PASSWORD_TOKEN_SECRET: process.env.RESET_PASSWORD_TOKEN_SECRET,
 };
 
 module.exports.constants = {
   MAX_PROFILE_IMAGE_FILE_SIZE: 1024 * 1024 * 2,
-  ACCESS_TOKEN_TIME: '1d', // toso: change this to 30s
+  MAX_GROUP_IMAGE_FILE_SIZE: 1024 * 1024 * 2,
+  ACCESS_TOKEN_TIME: '1d', // todo: change this to 30s
   REFRESH_TOKEN_TIME: '14d',
   EMAIL_TOKEN_TIME: '1d',
+  RESET_PASSWORD_TOKEN_TIME: '15m',
+  BRUTE_FORCE_PREFIX: 'BF_',
+  RATE_LIMITER_POINTS: 5,
+  RATE_LIMITER_DURATION: 1,
+  RATE_LIMITER_BLOCK_DURATION: 60 * 5,
+  RATE_LIMITER_PERFIX: 'RL_',
   REFRESH_TOKEN_COOKIE_MAX_AGE: 1000 * 60 * 60 * 24 * 14,
   EMAIL_REGEX: /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
   GROUP_MAX_USER_NUMBER: 100,

@@ -6,7 +6,16 @@ const { env } = require('../config/constants');
 const { formatLink } = require('../utils/files-paths');
 const { createJoinLinkToken } = require('../utils/create-tokens');
 
-exports.getGroupPublicData = (group) => {
+/**
+ * Returns the public data of a group.
+ * @async
+ * @param {Object} group - The group object.
+ * @returns {Promise<Object>}  A Promise that resolves with an object containing the public data of the group.
+ */
+exports.sanitizeGroup = async (group) => {
+  await group.populate('admins', 'username email');
+  await group.populate('members', 'username email');
+
   const sanitizedGroup = {
     id: group.id,
     name: group.name,
@@ -18,6 +27,13 @@ exports.getGroupPublicData = (group) => {
   return sanitizedGroup;
 };
 
+/**
+ * Creates a new group.
+ * @async
+ * @param {Object} group - The group object.
+ * @param {Object} user - The user object.
+ * @returns {Promise<Object|Error>} The updated user profile or an error if the group could not be created.
+ */
 exports.createGroup = async (group, user) => {
   const createdGroup = new Group({ name: group.name, members: [user.id], admins: [user.id] });
 
@@ -29,35 +45,53 @@ exports.createGroup = async (group, user) => {
   return await userService.getProfile(user);
 };
 
+/**
+ * Deletes a group.
+ * @async
+ * @param {Object} group - The group object.
+ * @param {Object} user - The user object.
+ * @returns {Promise<Object|Error>} The updated user profile or an error if the group could not be deleted.
+ */
 exports.deleteGroup = async (group, user) => {
   if (!this.isUserGroupAdmin(user, group)) {
     return boom.forbidden("You can't delete the group");
   }
 
-  user.groups = user.groups.filter((id) => id.toString() !== group.id);
+  user.groups = user.groups.filter((id) => id != group.id);
 
   await Group.deleteOne({ _id: group.id });
   await user.save();
 
-  return userService.getProfile(user);
+  return await userService.getProfile(user);
 };
 
+/**
+ * Returns the data of a group.
+ * @async
+ * @param {Object} group - The group object.
+ * @param {Object} user - The user object.
+ * @returns {Promise<Object|Error>} The public data of the group or an error if the user is not a member of the group.
+ */
 exports.getGroup = async (group, user) => {
   if (!this.isUserGroupMember(user, group)) {
     return boom.forbidden("You aren't a member in the group");
   }
 
-  await group.populate('members');
-  await group.populate('admins');
-
-  return this.getGroupPublicData(group);
+  return await this.sanitizeGroup(group);
 };
 
+/**
+ * Get groups data
+ * @async
+ * @param {Array} groups - An array of group objects.
+ * @param {Object} user - A user object.
+ * @returns {Promise<any[]>} - A promise that resolves to an array of group data.
+ */
 exports.getGroups = async (groups = [], user) => {
   const groupsData = await Promise.all(
     groups.map(async (group) => {
       if (!group) {
-        return boom.notFound("Some groups don't exist");
+        return group;
       }
       return await this.getGroup(group, user);
     })
@@ -66,6 +100,13 @@ exports.getGroups = async (groups = [], user) => {
   return groupsData;
 };
 
+/**
+ * Creates a join link for a group.
+ * @async
+ * @param {Object} group - The group object.
+ * @param {Object} user - The user object.
+ * @returns {Promuse<string|Error>} - The join link or error if the user is not an admin of the group.
+ */
 exports.createGroupJoinLink = async (group, user) => {
   if (!this.isUserGroupAdmin(user, group)) {
     return boom.forbidden("You aren't allowed to create a join link for the group");
@@ -81,31 +122,33 @@ exports.createGroupJoinLink = async (group, user) => {
   return link;
 };
 
+/**
+ * Adds members to a group.
+ * @param {Object} group - The group to add members to.
+ * @param {Object} user - The user adding members to the group.
+ * @param {Object[]} users - The users to add to the group.
+ * @returns {Promise<Object|Error>} - The profile of the user adding members to the group or error if the user is not an admin of the group.
+ */
 exports.addMembersToGroup = async (group, user, users) => {
   if (!this.isUserGroupAdmin(user, group)) {
     return boom.forbidden("You aren't allowed to add members to the group");
   }
 
-  let error;
-  users.every(async (user) => {
-    if (user) {
-      const joinedData = await userService.joinGroup(user, group);
-      if (joinedData instanceof Error) {
-        error = joinedData;
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  if (error) {
-    return error;
+  for (const user of users) {
+    await userService.joinGroup(user, group);
   }
 
   return await userService.getProfile(user);
 };
 
+/**
+ * Adds an admin to a group.
+ * @async
+ * @param {Object} group - The group to add the admin to.
+ * @param {Object} user - The user adding the admin.
+ * @param {Object} admin - The user to add as an admin.
+ * @returns {Promise<Object|Error>} The profile of the user or error if the user is not an admin of the group.
+ */
 exports.addAdminToGroup = async (group, user, admin) => {
   if (!this.isUserGroupAdmin(user, group)) {
     return boom.forbidden("You aren't allowed to add admin to the group");
@@ -126,6 +169,18 @@ exports.addAdminToGroup = async (group, user, admin) => {
   return await userService.getProfile(user);
 };
 
-exports.isUserGroupAdmin = (user, group) => group.admins.some((id) => id.toString() === user.id);
+/**
+ * Checks whether a user is an admin of a group.
+ * @param {Object} user - The user object.
+ * @param {Object} group - The group object.
+ * @returns {boolean} - `true` if the user is an admin of the group, `false` otherwise.
+ */
+exports.isUserGroupAdmin = (user, group) => group.admins.includes(user.id);
 
-exports.isUserGroupMember = (user, group) => group.members.some((id) => id.toString() === user.id);
+/**
+ * Checks whether a user is a member of a group.
+ * @param {Object} user - The user object.
+ * @param {Object} group - The group object.
+ * @returns {boolean} - `true` if the user is member of the group, `false` otherwise.
+ */
+exports.isUserGroupMember = (user, group) => group.members.includes(user.id);

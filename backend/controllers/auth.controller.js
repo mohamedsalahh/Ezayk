@@ -24,10 +24,11 @@ exports.login = async (req, res, next) => {
     maxAge: constants.REFRESH_TOKEN_COOKIE_MAX_AGE,
     httpOnly: true,
     sameSite: 'strict',
+    secure: env.NODE_ENV !== 'development',
     path: '/',
   });
 
-  res.status(200).json({
+  res.json({
     message: 'Logged-in successfully',
     data: {
       user,
@@ -40,7 +41,7 @@ exports.logout = async (req, res, next) => {
   await redisClient.del(`${req.userId}_refresh-token`);
   await redisClient.set(`${req.userId}_BL-token`, req.accessToken);
 
-  res.status(200).json({ message: 'Logged-out successfully', data: { userId: req.userId } });
+  res.json({ message: 'Logged-out successfully', data: { userId: req.userId } });
 };
 
 exports.getAccessToken = async (req, res, next) => {
@@ -50,22 +51,46 @@ exports.getAccessToken = async (req, res, next) => {
     maxAge: constants.REFRESH_TOKEN_COOKIE_MAX_AGE,
     httpOnly: true,
     sameSite: 'strict',
+    secure: env.NODE_ENV !== 'development',
     path: '/',
   });
 
-  res.status(200).json({
+  res.json({
     message: 'Access token generated successfully',
     data: { accessToken, userId: req.userId },
   });
 };
 
 exports.confirmUserEmail = async (req, res, next) => {
-  const token = req.params.token;
+  const token = req.params.confirmationToken;
 
-  const user = await authService.confirmUserEmail(token);
-  if (user instanceof Error) {
-    return next(user);
+  const error = await authService.confirmUserEmail(token);
+  if (error instanceof Error) {
+    return next(error);
   }
 
-  res.redirect(env.FRONTEND_URL);
+  res.sendStatus(204);
+};
+
+exports.forgotPassword = async (req, res, next) => {
+  const email = req.body.email;
+
+  const error = await authService.forgetPassword(email);
+  if (error instanceof Error) {
+    return next(error);
+  }
+
+  res.sendStatus(204);
+};
+
+exports.resetPassword = async (req, res, next) => {
+  const token = req.body.resetPasswordToken;
+  const password = req.body.password;
+
+  const error = await authService.resetPassword(token, password);
+  if (error instanceof Error) {
+    return next(error);
+  }
+
+  res.sendStatus(204);
 };

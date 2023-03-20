@@ -1,17 +1,19 @@
-const { createClient } = require('redis');
+const Redis = require('ioredis');
 
+const logger = require('./logger');
 const { env } = require('./constants');
 
-const redisClient = createClient(env.REDIS_PORT, env.REDIS_HOST);
-
-redisClient.connect();
+const redisClient = new Redis({
+  host: env.REDIS_HOST,
+  port: env.REDIS_PORT,
+});
 
 redisClient.on('connect', () => {
-  console.log('connected to Redis');
+  logger.info('connected to Redis');
 });
 
 redisClient.on('error', (err) => {
-  console.log(err);
+  logger.error(err);
 });
 
 module.exports = redisClient;

@@ -1,4 +1,6 @@
 const { Schema, model } = require('mongoose');
+const mongooseLeanId = require('mongoose-lean-id');
+const mongooseLeanVirtuals = require('mongoose-lean-virtuals');
 
 const { formatLink } = require('../utils/files-paths');
 const { env, constants } = require('../config/constants');
@@ -13,11 +15,6 @@ const groupSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-    },
-    image: {
-      type: String,
-      trim: true,
-      default: constants.DEFAULT_GROUP_IMAGE,
     },
     members: {
       type: [
@@ -47,16 +44,11 @@ const groupSchema = new Schema(
   { toObject: { virtuals: true }, toJSON: { virtuals: true }, versionKey: false }
 );
 
-groupSchema.virtual('id').get(function () {
-  return this._id.toString();
-});
-
-// groupSchema.virtual('imagePath').get(function () {
-//   return formatPath('public', 'groups-images', this.image);
-// });
-
 groupSchema.virtual('imageUrl').get(function () {
-  return formatLink(env.BACKEND_URL, 'groups-images', this.image);
+  return formatLink(env.BACKEND_URL, 'groups-images', this.id + '.png');
 });
+
+groupSchema.plugin(mongooseLeanVirtuals);
+groupSchema.plugin(mongooseLeanId);
 
 module.exports = model('Group', groupSchema);
