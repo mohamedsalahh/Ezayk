@@ -15,7 +15,7 @@ const userSchema = new Schema(
       trim: true,
       unique: true,
       minLength: 5,
-      maxLength: 50,
+      maxLength: 25,
     },
     email: {
       type: String,
@@ -23,7 +23,6 @@ const userSchema = new Schema(
       trim: true,
       lowercase: true,
       unique: true,
-      match: constants.EMAIL_REGEX,
     },
     password: {
       type: String,
@@ -37,7 +36,7 @@ const userSchema = new Schema(
     isEmailConfirmed: {
       type: Boolean,
       default: false,
-      select: false,
+      // select: false,
     },
     isGroupsPrivate: {
       type: Boolean,

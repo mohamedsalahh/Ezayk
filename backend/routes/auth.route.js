@@ -6,7 +6,8 @@ const authMiddleware = require('../middlewares/auth.middleware');
 const authValidator = require('../validators/auth.validator');
 const validate = require('../middlewares/validation.middleware');
 const asyncErrorHandler = require('../middlewares/asyncErrorHandler.middleware');
-const bruteforce = require('../config/bruteforce');
+const userMiddleware = require('../middlewares/user.middleware');
+const { bruteforce } = require('../config/rateLimiter');
 
 const router = express.Router();
 
@@ -30,6 +31,13 @@ router.post(
   '/logout',
   asyncErrorHandler(authMiddleware.verifyAccessToken),
   asyncErrorHandler(authController.logout)
+);
+
+router.get(
+  '/confirm-email',
+  asyncErrorHandler(authMiddleware.verifyAccessToken),
+  asyncErrorHandler(userMiddleware.getUser),
+  asyncErrorHandler(authController.sendConfirmationEmail)
 );
 
 router.post(

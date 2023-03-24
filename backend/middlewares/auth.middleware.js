@@ -21,7 +21,7 @@ exports.verifyAccessToken = async (req, res, next) => {
     return next(boom.unauthorized());
   }
 
-  const savedBlockedAccessToken = await redisClient.get(`${decodedAccessToken.userId}_BL-token`);
+  const savedBlockedAccessToken = await redisClient.get(`BL-token_${decodedAccessToken.userId}`);
 
   if (savedBlockedAccessToken === accessToken) {
     return next(boom.unauthorized());
@@ -34,7 +34,6 @@ exports.verifyAccessToken = async (req, res, next) => {
 
 exports.verifyRefreshToken = async (req, res, next) => {
   const refreshToken = req.cookies?.refreshToken;
-
   let decodedRefreshToken;
   try {
     decodedRefreshToken = refreshToken && jwt.verify(refreshToken, env.REFRESH_TOKEN_SECRET);
@@ -46,7 +45,7 @@ exports.verifyRefreshToken = async (req, res, next) => {
     return next(boom.unauthorized());
   }
 
-  const savedRefreshToken = await redisClient.get(`${decodedRefreshToken.userId}_refresh-token`);
+  const savedRefreshToken = await redisClient.get(`refresh-token_${decodedRefreshToken.userId}`);
   if (savedRefreshToken !== refreshToken) {
     return next(boom.unauthorized());
   }

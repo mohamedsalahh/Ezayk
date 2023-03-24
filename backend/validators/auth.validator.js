@@ -9,8 +9,9 @@ exports.signup = [
     .withMessage('Username is required')
     .notEmpty()
     .withMessage("Username shouldn't be empty")
-    .isLength({ min: 5 })
-    .withMessage("Username shouldn't be less than 5 charcters")
+    .isAlphanumeric() // todo: add _
+    .isLength({ min: 4, max: 25 })
+    .withMessage("Username shouldn't be less than 5 charcters or more than 25")
     .custom(async (value) => {
       try {
         const user = await User.findOne({ username: value });
@@ -69,6 +70,7 @@ exports.login = [
 
 module.exports.forgotPassword = [
   body('email', 'Invalid e-mail.')
+    .normalizeEmail()
     .exists()
     .withMessage('E-mail is required')
     .isEmail()

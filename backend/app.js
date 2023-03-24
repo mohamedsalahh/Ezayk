@@ -22,6 +22,8 @@ const rateLimiterMiddleware = require('./middlewares/rateLimiter.middleware');
 
 const app = express();
 
+// connectToSocketIo(app);
+
 app.set('trust proxy', 1);
 
 app.use(bodyParser.json());
@@ -65,32 +67,26 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  if (!err.output?.payload || !err.output?.statusCode) {
+  if (!err.isBoom) {
+    if (err.name === 'ValidationError') {
+      const error = boom.badData(Object.values(err.errors)[0].properties.message);
+      return res.status(error.output.statusCode).json({ data: error.output.payload });
+    }
+    logger.error(err.message);
     const error = boom.badImplementation();
-    logger.error(error.output.payload);
-
     return res.status(error.output.statusCode).json({ data: error.output.payload });
   }
 
-  logger.error(err.output.payload);
-
-  if (err.data) {
-    err.output.payload.data = err.data;
-  }
+  // if (err.data) {
+  //   err.output.payload.data = err.data;
+  // }
   res.status(err.output.statusCode).json({ data: err.output.payload });
 });
 
-const initApp = async () => {
-  try {
-    connectToMongoDB();
-
-    const server = app.listen(env.PORT);
-
-    await connectToSocketIo(server);
-    initSocketIoConnection();
-  } catch (err) {
+connectToMongoDB()
+  .then(() => {
+    app.listen(env.PORT);
+  })
+  .catch((err) => {
     logger.error(err);
-  }
-};
-
-initApp();
+  });

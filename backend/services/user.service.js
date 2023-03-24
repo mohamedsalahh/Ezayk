@@ -13,12 +13,13 @@ const groupService = require('./group.service');
  * @returns {Promise<Object>} - A Promise that resolves with an object containing the public data of the user.
  */
 exports.sanitizeUser = async (user, targetUser) => {
-  await user.populate('groups', 'name'); // todo: selected feilds
+  await user.populate('groups', 'name');
 
   const sanitizedUser = {
     id: targetUser.id,
     username: targetUser.username,
     email: targetUser.email,
+    isEmailConfirmed: user.id == targetUser.id ? targetUser.isEmailConfirmed : undefined,
     imageUrl: targetUser.imageUrl,
     isGroupsPrivate: targetUser.isGroupsPrivate,
     groups: user.id == targetUser.id || !targetUser.isGroupsPrivate ? targetUser.groups : [],

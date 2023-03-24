@@ -49,7 +49,7 @@ exports.signup = async (user) => {
  */
 exports.sendConfirmationEmail = async (user) => {
   const emailToken = createConfirmationEmailToken(user.id);
-  const confirmationEmailUrl = formatLink(env.FRONTEND_URL, 'auth', 'confirm-email', emailToken);
+  const confirmationEmailUrl = formatLink(env.FRONTEND_URL, 'confirm-email', emailToken);
 
   await sendEmail(user.email, templates.CONFIRMATION_EMAIL, {
     username: user.username,
@@ -87,7 +87,7 @@ exports.isUserCredentialsValid = async (user) => {
   }
 
   const savedUser = await User.findOne({ $or: [{ email: email }, { username: email }] }).select(
-    '+password +isEmailConfirmed'
+    '+password'
   );
   if (!savedUser) {
     return boom.unauthorized('Wrong e-mail or password');
@@ -95,7 +95,6 @@ exports.isUserCredentialsValid = async (user) => {
 
   if (!savedUser.isEmailConfirmed) {
     await this.sendConfirmationEmail(savedUser);
-    return boom.unauthorized('Confirm your email first to login');
   }
 
   const isPasswordCorrect = await bcrypt.compare(password, savedUser.password);
@@ -116,7 +115,7 @@ exports.createTokens = async (userId) => {
   const accessToken = createAccessToken(userId);
   const refreshToken = createRefreshToken(userId);
 
-  await redisClient.set(`${userId}_refresh-token`, refreshToken);
+  await redisClient.set(`refresh-token_${userId}`, refreshToken);
 
   return { accessToken, refreshToken };
 };
@@ -125,7 +124,7 @@ exports.createTokens = async (userId) => {
  * Confirms the user's email and returns the user profile.
  * @async
  * @param {string} token - The email confirmation token.
- * @returns {Promise<void|Error>} - A Promise that resolves to undefined if the email confirmation is successful, otherwise an Error object.
+ * @returns {Promise<Object|Error>} - A Promise that resolves to user profile if the email confirmation is successful, otherwise an Error object.
  */
 exports.confirmUserEmail = async (token) => {
   try {
@@ -135,7 +134,7 @@ exports.confirmUserEmail = async (token) => {
       return boom.unauthorized();
     }
 
-    const savedUser = await User.findById(decodedToken.userId).select('+isEmailConfirmed');
+    const savedUser = await User.findById(decodedToken.userId);
 
     if (!savedUser) {
       return boom.unauthorized();
@@ -144,6 +143,8 @@ exports.confirmUserEmail = async (token) => {
     savedUser.isEmailConfirmed = true;
 
     await savedUser.save();
+
+    return await userService.getProfile(savedUser);
   } catch (err) {
     return boom.unauthorized();
   }
@@ -156,7 +157,7 @@ exports.confirmUserEmail = async (token) => {
  * @returns {Promise<void|Error>} - Returns a promise that resolves to undefined or an error if the email is not found or the user's email is not confirmed.
  */
 exports.forgetPassword = async (email) => {
-  const user = await User.findOne({ email: email }).select('+isEmailConfirmed +resetPasswordToken');
+  const user = await User.findOne({ email: email }).select('+resetPasswordToken');
   if (!user) {
     return boom.notFound('E-mail not found');
   }
@@ -171,12 +172,7 @@ exports.forgetPassword = async (email) => {
   user.resetPasswordToken = resetPasswordToken;
   await user.save();
 
-  const resetPasswordUrl = formatLink(
-    env.FRONTEND_URL,
-    'auth',
-    'reset-password',
-    resetPasswordToken
-  );
+  const resetPasswordUrl = formatLink(env.FRONTEND_URL, 'reset-password', resetPasswordToken);
 
   await sendEmail(user.email, templates.RESET_PASSWORD_EMAIL, {
     username: user.username,
@@ -196,7 +192,7 @@ exports.resetPassword = async (token, newPassword) => {
     const decodedToken = token && jwt.verify(token, env.RESET_PASSWORD_TOKEN_SECRET);
 
     if (!decodedToken) {
-      return boom.badRequest('Invalid token');
+      return boom.badRequest('Something went wrong');
     }
 
     const savedUser = await User.findById(decodedToken.userId).select(
@@ -204,13 +200,14 @@ exports.resetPassword = async (token, newPassword) => {
     );
 
     if (!savedUser || savedUser.resetPasswordToken !== token) {
-      return boom.badRequest('Invalid token');
+      return boom.badRequest('Something went wrong');
     }
 
     savedUser.password = newPassword;
     savedUser.resetPasswordToken = null;
     await savedUser.save();
+    await redisClient.del(`refresh-token_${savedUser.id}`);
   } catch (err) {
-    return boom.badRequest('Invalid token');
+    return boom.badRequest('Something went wrong');
   }
 };

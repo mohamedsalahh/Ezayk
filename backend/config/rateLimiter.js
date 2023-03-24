@@ -1,4 +1,5 @@
 const { RateLimiterRedis } = require('rate-limiter-flexible');
+const ExpressBruteFlexible = require('rate-limiter-flexible/lib/ExpressBruteFlexible');
 
 const { constants } = require('../config/constants');
 const redisClient = require('../config/redis');
@@ -11,4 +12,12 @@ const rateLimiter = new RateLimiterRedis({
   blockDuration: constants.RATE_LIMITER_BLOCK_DURATION,
 });
 
-module.exports = rateLimiter;
+const bruteforce = new ExpressBruteFlexible(ExpressBruteFlexible.LIMITER_TYPES.REDIS, {
+  storeClient: redisClient,
+  freeRetries: constants.BRUTE_FORCE_RETRIES,
+  maxWait: constants.BRUTE_FORCE_WAITING_TIME,
+  lifetime: 30,
+  prefix: constants.BRUTE_FORCE_PREFIX,
+});
+
+module.exports = { rateLimiter, bruteforce };
