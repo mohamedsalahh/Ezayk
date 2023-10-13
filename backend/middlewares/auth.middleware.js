@@ -1,11 +1,11 @@
 const jwt = require('jsonwebtoken');
 const boom = require('@hapi/boom');
-const { body } = require('express-validator');
 
+const User = require('../models/user.model');
 const redisClient = require('../config/redis');
 const { env } = require('../config/constants');
 
-exports.verifyAccessToken = async (req, res, next) => {
+exports.isAuth = async (req, res, next) => {
   const authHeader = req.get('Authorization');
 
   const accessToken = authHeader && authHeader.split(' ')[1];
@@ -27,8 +27,57 @@ exports.verifyAccessToken = async (req, res, next) => {
     return next(boom.unauthorized());
   }
 
-  req.userId = decodedAccessToken.userId;
   req.accessToken = accessToken;
+
+  const userId = decodedAccessToken.userId;
+
+  const user = userId && (await User.findById(userId));
+  if (!user) {
+    return next(boom.notFound('User not found'));
+  }
+
+  req.user = user;
+
+  next();
+};
+
+exports.tryAuth = async (req, res, next) => {
+  const authHeader = req.get('Authorization');
+
+  const accessToken = authHeader && authHeader.split(' ')[1];
+
+  let decodedAccessToken;
+  try {
+    decodedAccessToken = accessToken && jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET);
+  } catch (err) {
+    return next();
+  }
+
+  if (!decodedAccessToken) {
+    return next();
+  }
+
+  const savedBlockedAccessToken = await redisClient.get(`BL-token_${decodedAccessToken.userId}`);
+
+  if (savedBlockedAccessToken === accessToken) {
+    return next();
+  }
+
+  const userId = decodedAccessToken.userId;
+  const user = userId && (await User.findById(userId));
+
+  req.user = user;
+
+  next();
+};
+
+exports.isEmailConfirmed = (req, res, next) => {
+  const user = req.user;
+
+  if (!user?.isEmailConfirmed) {
+    return next(boom.forbidden('Confirm your e-mail first'));
+  }
+
   next();
 };
 
@@ -51,21 +100,5 @@ exports.verifyRefreshToken = async (req, res, next) => {
   }
 
   req.userId = decodedRefreshToken.userId;
-  next();
-};
-
-exports.isAdmin = (req, res, next) => {
-  if (!user.isAdmin) {
-    return next(boom.forbidden("You don't have the access for this"));
-  }
-  next();
-};
-
-exports.normalizeUserCredentials = async (req, res, next) => {
-  const isEmail = req.isEmail;
-  if (isEmail) {
-    await body('email').normalizeEmail().run(req);
-  }
-
   next();
 };

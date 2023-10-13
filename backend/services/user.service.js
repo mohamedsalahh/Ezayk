@@ -5,60 +5,49 @@ const User = require('../models/user.model');
 const Group = require('../models/group.model');
 const groupService = require('./group.service');
 
-/**
- * Returns the public data of a user.
- * @async
- * @param {Object} user - The user object.
- * @param {Object} targetUser - The target user object.
- * @returns {Promise<Object>} - A Promise that resolves with an object containing the public data of the user.
- */
-exports.sanitizeUser = async (user, targetUser) => {
-  await user.populate('groups', 'name');
+exports.sanitizeUser = (user, includePrivatefields = false) => {
+  if (!user) {
+    return {};
+  }
 
   const sanitizedUser = {
-    id: targetUser.id,
-    username: targetUser.username,
-    email: targetUser.email,
-    isEmailConfirmed: user.id == targetUser.id ? targetUser.isEmailConfirmed : undefined,
-    imageUrl: targetUser.imageUrl,
-    isGroupsPrivate: targetUser.isGroupsPrivate,
-    groups: user.id == targetUser.id || !targetUser.isGroupsPrivate ? targetUser.groups : [],
-    isAdmin: user.id == targetUser.id ? targetUser.isAdmin : undefined,
+    id: user._id,
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    imageUrl: user.imageUrl,
+    isGroupsPrivate: user.isGroupsPrivate,
+    groups: includePrivatefields || !user.isGroupsPrivate ? user.groups : [],
+    isEmailConfirmed: includePrivatefields ? user.isEmailConfirmed : undefined,
   };
 
   return sanitizedUser;
 };
 
-/**
- * Returns the profile data of a user.
- * @async
- * @param {Object} user - The user object.
- * @returns {Promise<Object>} - A Promise that resolves with an object containing the profile data of the user.
- */
-exports.getProfile = async (user) => {
-  return await this.sanitizeUser(user, user);
+exports.getUserProfile = (user) => {
+  return this.sanitizeUser(user, true);
 };
 
-/**
- * Returns the data of a user.
- * @async
- * @param {Object} user - The user object.
- * @param {Object} targetUser - The target user object.
- * @returns {Promise<Object>} - A Promise that resolves with an object containing the public data of the user.
- */
-exports.getUser = async (user, targetUser) => {
-  return await this.sanitizeUser(user, targetUser);
+exports.getUserByUsername = async (username) => {
+  const user = await User.findOne({ username }).select('-groups').lean({ virtuals: true });
+
+  if (!user) {
+    return boom.notFound('User not found');
+  }
+
+  return this.sanitizeUser(user);
 };
 
-/**
- * Get users.
- * @async
- * @param {Object} options - The query object.
- * @param {string} query.username - The username to search for.
- * @param {number} query.skip - The number of documents to skip.
- * @param {number} query.limit - The maximum number of documents to return.
- * @returns {Promise<Object>} The users and total.
- */
+exports.getUserById = async (userId) => {
+  const user = await User.findById(userId).select('-groups').lean({ virtuals: true });
+
+  if (!user) {
+    return boom.notFound('User not found');
+  }
+
+  return this.sanitizeUser(user);
+};
+
 exports.getUsers = async ({ username, skip, limit }) => {
   const query = {};
 
@@ -79,43 +68,6 @@ exports.getUsers = async ({ username, skip, limit }) => {
   return { users, total };
 };
 
-/**
- * Changes the username of a user.
- * @async
- * @param {Object} user - The user object.
- * @param {string} username - The new username.
- * @returns {Promise<Object>} The updated user profile.
- */
-exports.changeUsername = async (user, username) => {
-  user.username = username;
-
-  await user.save();
-
-  return await this.getProfile(user);
-};
-
-/**
- * Changes the privacy of user groups.
- * @async
- * @param {Object} user - The user object.
- * @param {boolean} isGroupsPrivate - The privacy status of the user groups.
- * @returns {Promise<Object>} - The updated user profile.
- */
-exports.changeGroupsPrivacy = async (user, isGroupsPrivate) => {
-  user.isGroupsPrivate = isGroupsPrivate;
-
-  await user.save();
-
-  return await this.getProfile(user);
-};
-
-/**
- * Joins a user to a group.
- * @async
- * @param {Object} user - The user object.
- * @param {Object} group - The group object.
- * @returns {Promise<Object|Error>} The updated user profile or an error if the user cannot join the group.
- */
 exports.joinGroup = async (user, group) => {
   const canUserJoin = this.canUserJoinGroup(user, group);
   if (canUserJoin instanceof Error) {
@@ -128,20 +80,13 @@ exports.joinGroup = async (user, group) => {
   await user.save();
   await group.save();
 
-  return await this.getProfile(user);
+  return this.getUserProfile(user);
 };
 
-/**
- * Joins a user to a group via a join link.
- * @async
- * @param {Object} user - The user object.
- * @param {string} token - The join link token.
- * @returns {Promise<Object|Error>} The updated user profile or an error if the join link is invalid.
- */
 exports.joinGroupViaLink = async (user, token) => {
   let decodedToken;
   try {
-    decodedToken = token && jwt.verify(token, env.EMAIL_TOKEN_SECRET);
+    decodedToken = token && jwt.verify(token, env.GROUP_JOIN_LINK_TOKEN_SECRET);
   } catch (err) {
     return boom.badRequest('Invalid join link');
   }
@@ -158,19 +103,13 @@ exports.joinGroupViaLink = async (user, token) => {
   return await this.joinGroup(user, group);
 };
 
-/**
- * Checks if a user can join a group.
- * @param {Object} user - The user object.
- * @param {Object} group - The group object.
- * @returns {boolean|Error} True if the user can join the group, or an error if the user cannot join the group.
- */
 exports.canUserJoinGroup = (user, group) => {
   const isGroupMember =
     group.members.some((id) => id == user.id) && user.groups.some((id) => id == group.id);
 
   if (isGroupMember) {
     return boom.forbidden('Already in the group', {
-      user: this.sanitizeUser({}, user),
+      user: this.sanitizeUser({}, user), // todo
     });
   }
 
@@ -181,13 +120,6 @@ exports.canUserJoinGroup = (user, group) => {
   return true;
 };
 
-/**
- * Removes a user from a group.
- * @async
- * @param {Object} user - The user object.
- * @param {Object} group - The group object.
- * @returns {Promise<Object|Error>} The updated user profile or an error.
- */
 exports.leaveGroup = async (user, group) => {
   if (groupService.isUserGroupAdmin(user, group) && group.admins.length === 1) {
     if (group.members.length === 1) {
@@ -204,5 +136,5 @@ exports.leaveGroup = async (user, group) => {
   await user.save();
   await group.save();
 
-  return await this.getProfile(user);
+  return this.getUserProfile(user);
 };

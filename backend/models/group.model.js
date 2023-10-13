@@ -6,7 +6,7 @@ const { formatLink } = require('../utils/files-paths');
 const { env, constants } = require('../config/constants');
 
 const groupMembersLimit = (array) => {
-  return array.length <= constants.GROUP_MAX_USER_NUMBER;
+  return array.length <= constants.GROUP_MAX_MEMBERS_NUMBER;
 };
 
 const groupSchema = new Schema(
@@ -35,17 +35,18 @@ const groupSchema = new Schema(
     },
     joinLinkToken: {
       type: String,
+      unique: true,
     },
     createdAt: {
       type: Date,
       default: Date.now(),
     },
   },
-  { toObject: { virtuals: true }, toJSON: { virtuals: true }, versionKey: false }
+  { toObject: { virtuals: true }, toJSON: { virtuals: true } }
 );
 
 groupSchema.virtual('imageUrl').get(function () {
-  return formatLink(env.BACKEND_URL, 'groups-images', this.id + '.png');
+  return formatLink(env.BACKEND_URL, 'groups-images', this._id + '.png');
 });
 
 groupSchema.plugin(mongooseLeanVirtuals);

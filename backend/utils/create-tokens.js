@@ -42,8 +42,8 @@ exports.createConfirmationEmailToken = (userId) => {
     {
       userId,
     },
-    env.EMAIL_TOKEN_SECRET,
-    { expiresIn: constants.EMAIL_TOKEN_TIME }
+    env.CONFIRMATION_EMAIL_TOKEN_SECRET,
+    { expiresIn: constants.CONFIRMATION_EMAIL_TOKEN_TIME }
   );
 
   return confirmationEmailToken;

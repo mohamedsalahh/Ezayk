@@ -5,17 +5,21 @@ const mongooseLeanVirtuals = require('mongoose-lean-virtuals');
 const bcrypt = require('bcryptjs');
 
 const { formatLink } = require('../utils/files-paths');
-const { env, constants } = require('../config/constants');
+const { env } = require('../config/constants');
 
 const userSchema = new Schema(
   {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     username: {
       type: String,
       required: true,
       trim: true,
       unique: true,
-      minLength: 5,
-      maxLength: 25,
+      maxLength: 30,
     },
     email: {
       type: String,
@@ -24,19 +28,18 @@ const userSchema = new Schema(
       lowercase: true,
       unique: true,
     },
+    bio: {
+      type: String,
+    },
     password: {
       type: String,
       required: true,
       select: false,
-    },
-    isAdmin: {
-      type: Boolean,
-      default: false,
+      minLength: 4,
     },
     isEmailConfirmed: {
       type: Boolean,
       default: false,
-      // select: false,
     },
     isGroupsPrivate: {
       type: Boolean,
@@ -57,11 +60,11 @@ const userSchema = new Schema(
       default: Date.now(),
     },
   },
-  { toObject: { virtuals: true }, toJSON: { virtuals: true }, versionKey: false }
+  { toObject: { virtuals: true }, toJSON: { virtuals: true } }
 );
 
 userSchema.virtual('imageUrl').get(function () {
-  return formatLink(env.BACKEND_URL, 'profiles-images', this.id + '.png');
+  return formatLink(env.BACKEND_URL, 'profiles-images', this._id + '.png');
 });
 
 userSchema.pre('save', async function (next) {

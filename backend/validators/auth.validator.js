@@ -1,17 +1,20 @@
 const { body, check, oneOf, param } = require('express-validator');
-const validator = require('validator');
 
 const User = require('../models/user.model');
+const { constants } = require('../config/constants');
 
 exports.signup = [
-  body('username', 'Invalid Username.')
+  body('username', 'Invalid username')
     .exists()
     .withMessage('Username is required')
     .notEmpty()
     .withMessage("Username shouldn't be empty")
-    .isAlphanumeric() // todo: add _
-    .isLength({ min: 4, max: 25 })
-    .withMessage("Username shouldn't be less than 5 charcters or more than 25")
+    .matches(constants.USERNAME_REGEX)
+    .withMessage(
+      'Username should only contain alphanumeric characters or hyphens, and connot begin or end with a hyphen'
+    )
+    .isLength({ max: 30 })
+    .withMessage('Username shouldnot be more than 30 characters')
     .custom(async (value) => {
       try {
         const user = await User.findOne({ username: value });
@@ -22,7 +25,7 @@ exports.signup = [
         return Promise.reject('Something went wrong');
       }
     }),
-  body('email', 'Invalid e-mail.')
+  body('email', 'Invalid e-mail')
     .exists()
     .withMessage('E-mail is required')
     .isEmail()
@@ -37,12 +40,12 @@ exports.signup = [
         return Promise.reject('Something went wrong');
       }
     }),
-  body('password', 'Invalid password.')
+  body('password', 'Invalid password')
     .exists()
     .withMessage('Password is required')
-    .isStrongPassword({ minLength: 5 })
+    .isStrongPassword({ minLength: 4 })
     .withMessage(
-      "Password shouldn't be less than 5 and at least has one digit, one symbol, one uppercase letter, and one lowercase letter"
+      'Password must contain at least 4 characters, including at least one digit, one symbol, one uppercase letter, and one lowercase letter'
     ),
 ];
 
@@ -50,27 +53,16 @@ exports.login = [
   oneOf([
     check('email')
       .exists()
-      .withMessage('E-mail is required')
+      .withMessage('Username/E-mail is required')
       .isEmail()
-      .withMessage('E-mail not valid')
-      .custom((value, { req }) => {
-        if (validator.isEmail(value)) {
-          req.isEmail = true;
-        }
-        return true;
-      }),
-    check('email')
-      .exists()
-      .withMessage('E-mail is required')
-      .isLength({ min: 5 })
-      .withMessage('Invalid username length'),
+      .withMessage('E-mail not valid'),
+    check('username').exists().withMessage('Username/E-mail is required'),
   ]),
   body('password').exists().withMessage('Password is required'),
 ];
 
 module.exports.forgotPassword = [
   body('email', 'Invalid e-mail.')
-    .normalizeEmail()
     .exists()
     .withMessage('E-mail is required')
     .isEmail()
@@ -82,8 +74,8 @@ module.exports.resetPassword = [
   body('password', 'Invalid password.')
     .exists()
     .withMessage('Password is required')
-    .isStrongPassword({ minLength: 5 })
+    .isStrongPassword({ minLength: 4 })
     .withMessage(
-      "Password shouldn't be less than 5 and at least has one digit, one symbol, one uppercase letter, and one lowercase letter"
+      'Password must contain at least 4 characters, including at least one digit, one symbol, one uppercase letter, and one lowercase letter'
     ),
 ];

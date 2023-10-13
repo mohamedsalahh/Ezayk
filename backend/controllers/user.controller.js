@@ -1,58 +1,49 @@
 const multer = require('multer');
 
-const User = require('../models/user.model');
 const userService = require('../services/user.service');
 const { constants } = require('../config/constants');
 
 exports.getUsers = async (req, res, next) => {
-  const users = await userService.getUsers(req.body);
-  res.json({ data: users });
+  const usersData = await userService.getUsers(req.body);
+
+  res.json(usersData);
 };
 
 exports.getUser = async (req, res, next) => {
   const user = req.user;
-  const targetUserId = req.body.id;
+  const username = req.body.username;
 
-  const targetUser = await User.findById(targetUserId);
-  if (!targetUser) {
-    return next(boom.notFound("Couldn't find the user"));
+  const targetUser =
+    user?.username === username
+      ? userService.getUserProfile(user)
+      : await userService.getUserByUsername(username);
+  if (targetUser instanceof Error) {
+    return next(targetUser);
   }
 
-  const targetUserData = await userService.getUser(user, targetUser);
-
-  res.json({ data: { user: targetUserData } });
+  res.json({ user: targetUser });
 };
 
 exports.deleteUser = async (req, res, next) => {
-  const targetUserId = req.body.id;
-
-  await User.deleteOne({ _id: targetUserId });
-
-  res.json({ message: 'Deleted successfully' });
-};
-
-exports.updateUsername = async (req, res, next) => {
   const user = req.user;
-  const username = req.body.username;
 
-  const userData = await userService.changeUsername(user, username);
+  await userService.deleteUser(user?.id);
 
-  res.status(201).json({ data: { user: userData } });
+  next();
 };
 
-exports.changeGroupsPrivacy = async (req, res, next) => {
+exports.updateUser = async (req, res, next) => {
   const user = req.user;
-  const isGroupsPrivate = req.body.isGroupsPrivate;
 
-  const userData = await userService.changeGroupsPrivacy(user, isGroupsPrivate);
+  const newUserData = await userService.updateUser(user, req.body);
 
-  res.status(201).json({ data: { user: userData } });
+  res.json({ user: newUserData });
 };
 
-exports.updateProfileImage = multer({
+exports.updateUserProfileImage = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, 'public/profiles-images');
+      cb(null, path.join('public', 'profiles-images'));
     },
     filename: (req, file, cb) => {
       cb(null, req.user.id + '.png');
@@ -68,16 +59,15 @@ exports.updateProfileImage = multer({
   limits: { fileSize: constants.MAX_PROFILE_IMAGE_FILE_SIZE },
 });
 
-exports.joinGroup = async (req, res, next) => {
+exports.getUserGroups = async (req, res, next) => {
   const user = req.user;
-  const group = req.group;
 
-  const UserData = await userService.joinGroup(user, group);
-  if (UserData instanceof Error) {
-    return next(UserData);
+  const groupsData = await userService.getUserGroups(user, req.body);
+  if (groupsData instanceof Error) {
+    return next(groupsData);
   }
 
-  res.json({ data: { user: UserData } });
+  res.json(groupsData);
 };
 
 exports.joinGroupViaLink = async (req, res, next) => {
@@ -89,17 +79,17 @@ exports.joinGroupViaLink = async (req, res, next) => {
     return next(UserData);
   }
 
-  res.json({ data: { user: UserData } });
+  res.sendStatus(204);
 };
 
 exports.leaveGroup = async (req, res, next) => {
   const user = req.user;
-  const group = req.group;
+  const groupId = req.groupId;
 
-  const userData = await userService.leaveGroup(user, group);
+  const userData = await userService.leaveGroup(user, groupId);
   if (userData instanceof Error) {
     return next(userData);
   }
 
-  res.json({ data: { user: userData } });
+  res.sendStatus(204);
 };

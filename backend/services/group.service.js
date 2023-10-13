@@ -42,7 +42,7 @@ exports.createGroup = async (group, user) => {
   await user.save();
   await createdGroup.save();
 
-  return await userService.getProfile(user);
+  return userService.getUserProfile(user);
 };
 
 /**
@@ -62,7 +62,7 @@ exports.deleteGroup = async (group, user) => {
   await Group.deleteOne({ _id: group.id });
   await user.save();
 
-  return await userService.getProfile(user);
+  return userService.getUserProfile(user);
 };
 
 /**
@@ -138,7 +138,7 @@ exports.addMembersToGroup = async (group, user, users) => {
     await userService.joinGroup(user, group);
   }
 
-  return await userService.getProfile(user);
+  return userService.getUserProfile(user);
 };
 
 /**
@@ -155,7 +155,7 @@ exports.addAdminToGroup = async (group, user, admin) => {
   }
 
   if (this.isUserGroupAdmin(admin, group)) {
-    return await userService.getProfile(user);
+    return userService.getUserProfile(user);
   }
 
   if (!this.isUserGroupMember(admin, group)) {
@@ -166,7 +166,7 @@ exports.addAdminToGroup = async (group, user, admin) => {
 
   await group.save();
 
-  return await userService.getProfile(user);
+  return userService.getUserProfile(user);
 };
 
 /**

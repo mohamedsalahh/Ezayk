@@ -1,31 +1,13 @@
-const { env, constants } = require('../config/constants');
-const redisClient = require('../config/redis');
+const User = require('../models/user.model');
 const authService = require('../services/auth.service');
 const userService = require('../services/user.service');
-const User = require('../models/user.model');
+const redisClient = require('../config/redis');
+const { env, constants } = require('../config/constants');
 
 exports.signup = async (req, res, next) => {
-  const user = await authService.signup(req.body);
-  const userTokens = await authService.login(req.body);
-  if (userTokens instanceof Error) {
-    return next(userTokens);
-  }
+  await authService.signup(req.body);
 
-  const {
-    tokens: { accessToken, refreshToken },
-  } = userTokens;
-
-  res.cookie('refreshToken', refreshToken, {
-    maxAge: constants.REFRESH_TOKEN_COOKIE_MAX_AGE,
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: env.NODE_ENV !== 'development',
-  });
-
-  res.status(201).json({
-    message: 'Signed-up successfully',
-    data: { user, accessToken },
-  });
+  next();
 };
 
 exports.login = async (req, res, next) => {
@@ -48,24 +30,29 @@ exports.login = async (req, res, next) => {
   });
 
   res.json({
-    message: 'Logged-in successfully',
-    data: {
-      user,
-      accessToken,
-    },
+    user,
+    accessToken,
   });
 };
 
 exports.logout = async (req, res, next) => {
-  await redisClient.del(`refresh-token_${req.userId}`);
-  await redisClient.set(`BL-token_${req.userId}`, req.accessToken);
+  const user = req.user;
 
-  res.json({ message: 'Logged-out successfully', data: { userId: req.userId } });
+  await redisClient.del(`refresh-token_${user.id}`);
+  await redisClient.set(`BL-token_${user.id}`, req.accessToken);
+
+  res.sendStatus(204);
 };
 
 exports.getAccessToken = async (req, res, next) => {
-  const { accessToken, refreshToken } = await authService.createTokens(req.userId);
-  const user = await User.findById(req.userId);
+  const userId = req.userId;
+
+  const user = await userService.getUserById(userId);
+  if (user instanceof Error) {
+    return next(user);
+  }
+
+  const { accessToken, refreshToken } = await authService.createTokens(userId);
 
   res.cookie('refreshToken', refreshToken, {
     maxAge: constants.REFRESH_TOKEN_COOKIE_MAX_AGE,
@@ -75,13 +62,15 @@ exports.getAccessToken = async (req, res, next) => {
   });
 
   res.json({
-    message: 'Access token generated successfully',
-    data: { accessToken, user: await userService.getProfile(user) },
+    accessToken,
+    user,
   });
 };
 
 exports.sendConfirmationEmail = async (req, res, next) => {
-  await authService.sendConfirmationEmail(req.user);
+  const user = req.user;
+
+  await authService.sendConfirmationEmail(user);
   res.sendStatus(204);
 };
 
@@ -93,7 +82,7 @@ exports.confirmUserEmail = async (req, res, next) => {
     return next(user);
   }
 
-  res.json({ dtat: { user } });
+  res.json({ user });
 };
 
 exports.forgotPassword = async (req, res, next) => {
